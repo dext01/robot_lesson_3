@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "practice_id": "PR03",
+  "commit": "ac1c9f337c63681327ed9b236f9f3916a9e26e7a",
+  "commands": [
+    "source /opt/ros/lyrical/setup.bash",
+    "export ROS_DOMAIN_ID=16",
+    "cd /work/src && ros2 pkg create --build-type ament_python --license Apache-2.0 --node-name patrol patrol --dependencies rclpy geometry_msgs turtlesim_msgs",
+    "colcon build --symlink-install --packages-select turtle_bringup patrol 2>&1 | tee evidence/pr03/build.txt",
+    "source /work/install/setup.bash",
+    "python3 -m pytest src/patrol/test/test_choose_cmd.py -v 2>&1 | tee evidence/pr03/tests.txt",
+    "ros2 launch turtle_bringup sim.launch.py",
+    "ros2 node list --no-daemon --spin-time 2",
+    "ros2 topic echo /turtle1/pose --once",
+    "ros2 run patrol patrol",
+    "ros2 topic info /cmd_vel --verbose",
+    "ros2 topic info /turtle1/cmd_vel --verbose",
+    "ros2 run patrol patrol --ros-args -r cmd_vel:=/turtle1/cmd_vel",
+    "timeout 12 ros2 topic hz /turtle1/cmd_vel --window 100"
+  ],
+  "tests": [
+    {
+      "name": "colcon build turtle_bringup + patrol",
+      "status": "passed",
+      "evidence": "build.txt"
+    },
+    {
+      "name": "pytest choose_cmd: 3 passed (no pose / normal / edge)",
+      "status": "passed",
+      "evidence": "tests.txt"
+    },
+    {
+      "name": "ros2 launch поднял /turtlesim; топики /turtle1/cmd_vel и /turtle1/pose видны",
+      "status": "passed",
+      "evidence": "nodes-launch.txt, topics-before-patrol.txt, pose-initial.txt"
+    },
+    {
+      "name": "patrol без remap: 1 pub /cmd_vel, 0 sub; черепаха стоит (x=5.544, theta=0)",
+      "status": "passed",
+      "evidence": "topics-broken.txt, topic-info-broken-cmd_vel.txt, topic-info-broken-turtle1_cmd_vel.txt, pose-after-broken.txt"
+    },
+    {
+      "name": "patrol с -r cmd_vel:=/turtle1/cmd_vel: 1 pub /turtle1/cmd_vel; черепаха едет (x: 5.544 -> 3.95, theta: 0 -> -1.88)",
+      "status": "passed",
+      "evidence": "topics-fixed.txt, topic-info-fixed.txt, pose-before-fixed.txt, pose-after-fixed.txt"
+    },
+    {
+      "name": "ros2 topic hz за 10 с показал average rate ~ 10.00 Hz (window 100, std dev 0.6 мс)",
+      "status": "passed",
+      "evidence": "hz-fixed.txt"
+    }
+  ],
+  "defect": {
+    "reproducer": "ros2 run patrol patrol (без remap). Нода публикует Twist в относительный топик cmd_vel, который в namespace / раскрывается в /cmd_vel. Turtlesim подписан на /turtle1/cmd_vel, поэтому команды не доходят.",
+    "root_cause": "Издатель и подписчик используют разные имена топика: /cmd_vel против /turtle1/cmd_vel. DDS матчит endpoint-ы по имени, тип совпадает лишь как вторичная проверка. Пока имена не совпали, это два разных топика, обмена между ними нет.",
+    "proof_after": "Тот же исполняемый файл запущен с --ros-args -r cmd_vel:=/turtle1/cmd_vel. Топик /cmd_vel исчез из графа, patrol стал единственным издателем /turtle1/cmd_vel, а topic hz за 10 с зафиксировал average rate 9.999 Hz (window 100). Поза сместилась с (5.544, 5.544, 0) до (3.95, 7.71, -1.88), linear_velocity/angular_velocity в позе стали 0.5 и 0.3 — ровно значения из choose_cmd."
+  },
+  "claims": {
+    "public_tests_passed": true,
+    "defect_reproduced": true,
+    "defect_fixed": true
+  },
+  "ai_used": true,
+  "recorded_at_utc": "2026-09-22T04:00:00Z"
+}
