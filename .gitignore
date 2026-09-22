@@ -1,0 +1,17 @@
+build/
+install/
+log/
+.course-kit/
+.claude/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
