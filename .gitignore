@@ -2,7 +2,6 @@ build/
 install/
 log/
 .course-kit/
-.claude/
 __pycache__/
 *.pyc
 *.pyo

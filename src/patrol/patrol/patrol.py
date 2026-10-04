@@ -5,6 +5,7 @@ from __future__ import annotations
 import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
+from rclpy.signals import SignalHandlerOptions
 from turtlesim_msgs.msg import Pose
 
 TIMER_PERIOD_SEC = 0.1
@@ -50,17 +51,21 @@ class PatrolNode(Node):
         cmd = choose_cmd(self._last_pose)
         self._cmd_pub.publish(cmd)
 
+    def publish_stop(self) -> None:
+        self._cmd_pub.publish(Twist())
+
 
 def main(args: list[str] | None = None) -> None:
-    rclpy.init(args=args)
+    # Без своего обработчика SIGINT rclpy не закрывает контекст до finally,
+    # и финальный нулевой Twist успевает уйти.
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
     node = PatrolNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        stop = Twist()
-        node._cmd_pub.publish(stop)
+        node.publish_stop()
         node.destroy_node()
         rclpy.try_shutdown()
 
